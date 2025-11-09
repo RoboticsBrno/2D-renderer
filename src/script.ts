@@ -141,6 +141,35 @@ abstract class Shape {
 
     abstract drawAntiAliased(): Pixels;
     abstract drawAliased(): Pixels;
+
+    protected getInsidePoints(vertices: Array<{ x: number, y: number }>): Pixels {
+        const minX = Math.min(...vertices.map(v => v.x));
+        const maxX = Math.max(...vertices.map(v => v.x));
+        const minY = Math.min(...vertices.map(v => v.y));
+        const maxY = Math.max(...vertices.map(v => v.y));
+
+        let points: Pixels = [];
+        for (let x = minX; x <= maxX; x++) {
+            for (let y = minY; y <= maxY; y++) {
+                let inside = false;
+                for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+                    const xi = vertices[i].x, yi = vertices[i].y;
+                    const xj = vertices[j].x, yj = vertices[j].y;
+
+                    const intersect = ((yi > y) !== (yj > y)) &&
+                        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+
+                if (inside) {
+                    points.push({ x, y, color: this.color });
+                }
+            }
+        }
+
+        return points;
+    }
+
 }
 
 
@@ -148,19 +177,165 @@ class Circle extends Shape {
     radius: number;
     fill: boolean;
 
-    constructor(x: number, y: number, color: string, radius: number, fill: boolean = true) {
-        super(x, y, color);
+    constructor(x: number, y: number, color: Color, radius: number, fill: boolean = true) {
+        super({ x, y, color });
         this.radius = radius;
         this.fill = fill;
     }
 
-    draw(display_width: number, display_height: number): Pixels {
-        let points: Array<{ x: number, y: number }> = [];
-        return points
-    }
-}
+    drawAliased(): Pixels {
+        let points: Pixels = [];
+        const center = this.getRotatedPosition(this.x, this.y);
+        const r = this.radius;
 
-type RectangleParams = ShapeParams & {
+        let x = 0;
+        let y = r;
+        let d = 1 - r;
+
+        while (x <= y) {
+            this.drawCirclePoints(points, center.x, center.y, x, y);
+
+            if (d < 0) {
+                d = d + 2 * x + 3;
+            } else {
+                d = d + 2 * (x - y) + 5;
+                y--;
+            }
+            x++;
+        }
+
+        if (this.fill) {
+            this.fillCircle(points, center.x, center.y, r);
+        }
+
+        return points;
+    }
+
+    drawAntiAliased(): Pixels {
+        let points: Pixels = [];
+        const center = this.getRotatedPosition(this.x, this.y);
+        const r = this.radius;
+
+        // Xiaolin Wu's circle algorithm for anti-aliased rendering
+        for (let x = 0; x <= r / Math.sqrt(2); x++) {
+            const y = Math.sqrt(r * r - x * x);
+
+            const error = y - Math.floor(y);
+            const intensity = error;
+            const intensity2 = 1 - error;
+
+            const y1 = Math.floor(y);
+            const y2 = y1 + 1;
+
+            this.drawAntiAliasedPoint(points, center.x, center.y, x, y1, intensity2);
+            this.drawAntiAliasedPoint(points, center.x, center.y, x, y2, intensity);
+            this.drawAntiAliasedPoint(points, center.x, center.y, y1, x, intensity2);
+            this.drawAntiAliasedPoint(points, center.x, center.y, y2, x, intensity);
+        }
+
+        if (this.fill) {
+            this.fillCircleAntiAliased(points, center.x, center.y, r);
+        }
+
+        return points;
+    }
+
+    private drawCirclePoints(points: Pixels, cx: number, cy: number, x: number, y: number) {
+        const pointsToDraw = [
+            { x: cx + x, y: cy + y },
+            { x: cx - x, y: cy + y },
+            { x: cx + x, y: cy - y },
+            { x: cx - x, y: cy - y },
+            { x: cx + y, y: cy + x },
+            { x: cx - y, y: cy + x },
+            { x: cx + y, y: cy - x },
+            { x: cx - y, y: cy - x }
+        ];
+
+        for (const point of pointsToDraw) {
+            points.push({
+                x: Math.round(point.x),
+                y: Math.round(point.y),
+                color: this.color
+            });
+        }
+    }
+
+    private drawAntiAliasedPoint(points: Pixels, cx: number, cy: number, x: number, y: number, intensity: number) {
+        const pointsToDraw = [
+            { x: cx + x, y: cy + y },
+            { x: cx - x, y: cy + y },
+            { x: cx + x, y: cy - y },
+            { x: cx - x, y: cy - y },
+            { x: cx + y, y: cy + x },
+            { x: cx - y, y: cy + x },
+            { x: cx + y, y: cy - x },
+            { x: cx - y, y: cy - x }
+        ];
+
+        for (const point of pointsToDraw) {
+            const clampedX = Math.max(0, Math.round(point.x));
+            const clampedY = Math.max(0, Math.round(point.y));
+
+            if (intensity > 0.01) {
+                points.push({
+                    x: clampedX,
+                    y: clampedY,
+                    color: {
+                        r: this.color.r,
+                        g: this.color.g,
+                        b: this.color.b,
+                        a: Math.max(0, Math.min(1, intensity * this.color.a)),
+                    }
+                });
+            }
+        }
+    }
+
+    private fillCircle(points: Pixels, cx: number, cy: number, r: number) {
+        for (let y = -r; y <= r; y++) {
+            const x = Math.sqrt(r * r - y * y);
+            const startX = Math.ceil(cx - x);
+            const endX = Math.floor(cx + x);
+
+            for (let x = startX; x <= endX; x++) {
+                points.push({
+                    x: Math.round(x),
+                    y: Math.round(cy + y),
+                    color: this.color
+                });
+            }
+        }
+    }
+
+    private fillCircleAntiAliased(points: Pixels, cx: number, cy: number, r: number) {
+        // Anti-aliased circle fill using distance field
+        for (let y = Math.ceil(cy - r); y <= Math.floor(cy + r); y++) {
+            for (let x = Math.ceil(cx - r); x <= Math.floor(cx + r); x++) {
+                const dx = x - cx;
+                const dy = y - cy;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= r) {
+                    let alpha = this.color.a;
+
+                    if (alpha > 0.01) {
+                        points.push({
+                            x: Math.round(x),
+                            y: Math.round(y),
+                            color: {
+                                r: this.color.r,
+                                g: this.color.g,
+                                b: this.color.b,
+                                a: alpha
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+} type RectangleParams = ShapeParams & {
     width: number,
     height: number,
     fill?: boolean,
@@ -168,7 +343,7 @@ type RectangleParams = ShapeParams & {
 
 class Rectangle extends Shape {
     width: number;
-    height: number
+    height: number;
     fill: boolean;
 
     constructor(params: RectangleParams) {
@@ -178,11 +353,17 @@ class Rectangle extends Shape {
         this.fill = params.fill === undefined ? true : params.fill;
     }
 
-    private getSegments(): LineSegment[] {
+    private getVertices(): Array<{ x: number, y: number }> {
         const tl = this.getRotatedPosition(this.x, this.y);
         const tr = this.getRotatedPosition(this.x + this.width - 1, this.y)
         const bl = this.getRotatedPosition(this.x, this.y + this.height - 1);
         const br = this.getRotatedPosition(this.x + this.width - 1, this.y + this.height - 1);
+
+        return [tl, tr, br, bl];
+    }
+
+    private getSegments(): LineSegment[] {
+        const [tl, tr, br, bl] = this.getVertices();
 
         return [
             new LineSegment({ x: tl.x, y: tl.y, x2: tr.x, y2: tr.y, color: this.color, z: this.z }),
@@ -200,6 +381,11 @@ class Rectangle extends Shape {
         const leftPoints = left.drawAntiAliased();
         const rightPoints = right.drawAntiAliased();
 
+        if (this.fill) {
+            const insidePoints: Pixels = this.getInsidePoints(this.getVertices());
+            points = points.concat(insidePoints);
+        }
+
         points = points.concat(topPoints, bottomPoints, leftPoints, rightPoints);
 
         return points
@@ -213,6 +399,11 @@ class Rectangle extends Shape {
         const leftPoints = left.drawAliased();
         const rightPoints = right.drawAliased();
 
+        if (this.fill) {
+            const insidePoints: Pixels = this.getInsidePoints(this.getVertices());
+            points = points.concat(insidePoints);
+        }
+
         points = points.concat(topPoints, bottomPoints, leftPoints, rightPoints);
 
         return points
@@ -221,25 +412,163 @@ class Rectangle extends Shape {
 
 class RegularPolygon extends Shape {
     sides: number;
-    sideLength: number;
+    type: 'sideLength' | 'radius';
+    sideLength?: number;
+    radius?: number;
     fill: boolean;
 
-    constructor(x: number, y: number, color: string, sides: number, sideLength: number, fill: boolean = true) {
-        super(x, y, color);
+    constructor(x: number, y: number, color: Color, sides: number, config: { sideLength: number, fill?: boolean } | { radius: number, fill?: boolean }) {
+        super({ x, y, color });
         this.sides = sides;
-        this.sideLength = sideLength;
-        this.fill = fill;
+        this.fill = config.fill ?? true;
+
+        if ('sideLength' in config) {
+            this.type = 'sideLength';
+            this.sideLength = config.sideLength;
+        } else {
+            this.type = 'radius';
+            this.radius = config.radius;
+        }
+    }
+
+    private getVertices(): Array<{ x: number, y: number }> {
+        let radius: number;
+        if (this.type === 'radius' && this.radius !== undefined) {
+            radius = this.radius;
+        } else if (this.type === 'sideLength' && this.sideLength !== undefined) {
+            radius = this.sideLength / (2 * Math.sin(Math.PI / this.sides));
+        } else {
+            throw new Error('Invalid configuration for RegularPolygon');
+        }
+
+        const vertices: Array<{ x: number, y: number }> = [];
+        for (let i = 0; i < this.sides; i++) {
+            const angle = 2 * Math.PI / this.sides * i - Math.PI / 2;
+            const x = this.x + radius * Math.cos(angle);
+            const y = this.y + radius * Math.sin(angle);
+            const rotated = this.getRotatedPosition(x, y);
+            vertices.push(rotated);
+        }
+        return vertices;
+    }
+
+    private getSegments(): LineSegment[] {
+        const vertices = this.getVertices();
+        const segments: LineSegment[] = [];
+
+        for (let i = 0; i < vertices.length; i++) {
+            const start = vertices[i];
+            const end = vertices[(i + 1) % vertices.length];
+            segments.push(new LineSegment({ x: start.x, y: start.y, x2: end.x, y2: end.y, color: this.color, z: this.z }));
+        }
+
+        return segments;
+
+    }
+
+
+    drawAliased(): Pixels {
+        let points: Pixels = [];
+        const segments = this.getSegments();
+
+        for (const segment of segments) {
+            const segmentPoints = segment.drawAliased();
+            points = points.concat(segmentPoints);
+        }
+
+        if (this.fill) {
+            const insidePoints: Pixels = this.getInsidePoints(this.getVertices());
+            points = points.concat(insidePoints);
+        }
+
+        return points
+    }
+
+    drawAntiAliased(): Pixels {
+        let points: Pixels = [];
+
+        const segments = this.getSegments();
+
+        for (const segment of segments) {
+            const segmentPoints = segment.drawAntiAliased();
+            points = points.concat(segmentPoints);
+        }
+
+        if (this.fill) {
+            const insidePoints: Pixels = this.getInsidePoints(this.getVertices());
+            points = points.concat(insidePoints);
+        }
+
+        return points
     }
 }
 
 class Polygon extends Shape {
-    points: Array<{ x: number, y: number }>;
+    vertices: Array<{ x: number, y: number, relative?: boolean }>;
     fill: boolean;
 
-    constructor(x: number, y: number, color: string, points: Array<{ x: number, y: number }>, fill: boolean = true) {
-        super(x, y, color);
-        this.points = points;
+    constructor(x: number, y: number, color: Color, vertices: Array<{ x: number, y: number, relative?: boolean }>, fill: boolean = true) {
+        super({ x, y, color });
+        this.vertices = vertices.map(v => ({
+            x: v.relative ? this.x + v.x : v.x,
+            y: v.relative ? this.y + v.y : v.y,
+            relative: false,
+        }));
         this.fill = fill;
+    }
+
+    private getTransformedVertices(): Array<{ x: number, y: number }> {
+        return this.vertices.map(v => this.getRotatedPosition(v.x, v.y));
+    }
+
+    private getSegments(): LineSegment[] {
+        const vertices = this.getTransformedVertices();
+        const segments: LineSegment[] = [];
+
+        for (let i = 0; i < vertices.length; i++) {
+            const start = vertices[i];
+            const end = vertices[(i + 1) % vertices.length];
+            segments.push(new LineSegment({ x: start.x, y: start.y, x2: end.x, y2: end.y, color: this.color, z: this.z }));
+        }
+
+        return segments;
+    }
+
+    drawAliased(): Pixels {
+        let points: Pixels = [];
+
+        const segments = this.getSegments();
+
+        for (const segment of segments) {
+            const segmentPoints = segment.drawAliased();
+            points = points.concat(segmentPoints);
+        }
+
+        if (this.fill) {
+            const insidePoints: Pixels = this.getInsidePoints(this.getTransformedVertices());
+            points = points.concat(insidePoints);
+        }
+
+
+        return points
+    }
+
+    drawAntiAliased(): Pixels {
+        let points: Pixels = [];
+
+        const segments = this.getSegments();
+
+        for (const segment of segments) {
+            const segmentPoints = segment.drawAntiAliased();
+            points = points.concat(segmentPoints);
+        }
+
+        if (this.fill) {
+            const insidePoints: Pixels = this.getInsidePoints(this.getTransformedVertices());
+            points = points.concat(insidePoints);
+        }
+
+        return points
     }
 }
 
@@ -391,15 +720,23 @@ class LineSegment extends Shape {
                     r: this.color.r,
                     g: this.color.g,
                     b: this.color.b,
-                    a: Math.max(0, Math.min(1, a)),
+                    a: Math.max(0, Math.min(1, a * this.color.a)),
                 }
             });
         }
     }
 }
-type PointParams = ShapeParams & {
-}
 class Point extends Shape {
+    constructor(x: number, y: number, color: Color) {
+        super({ x, y, color });
+    }
+
+    drawAntiAliased(): Pixels {
+        return [{ x: this.x, y: this.y, color: this.color }];
+    }
+    drawAliased(): Pixels {
+        return [{ x: this.x, y: this.y, color: this.color }];
+    }
 
 }
 
@@ -493,15 +830,17 @@ class Renderer {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    const drawer = new CanvasDrawer('myCanvas');
+    const width = 64;
+    const height = 64;
+    const drawer = new CanvasDrawer('myCanvas', width, height);
     drawer.clear('#FFF');
 
-    const renderer = new Renderer(64, 64, { r: 255, g: 255, b: 255, a: 1 });
+    const renderer = new Renderer(width, height, { r: 255, g: 255, b: 255, a: 1 });
 
     const scene = new Collection(0, 0, { r: 255, g: 255, b: 255, a: 1 });
 
-    const rect = new Rectangle({ x: 30, y: 30, color: { r: 0, g: 255, b: 0, a: 1 }, width: 20, height: 10, fill: false })
-    rect.rotate(30);
+    const rect = new Rectangle({ x: 30, y: 30, color: { r: 0, g: 255, b: 0, a: 1 }, width: 20, height: 10, fill: true })
+    rect.rotate(45);
     rect.setPivot(20, 20);
     scene.addShape(rect);
     const rect2 = new Rectangle({ x: 30, y: 30, color: { r: 140, g: 0, b: 0, a: 1 }, width: 20, height: 10, fill: false })
@@ -522,9 +861,49 @@ window.addEventListener('DOMContentLoaded', () => {
     line.setPivot(14, 10);
     scene.addShape(line);
 
+    const ngon = new RegularPolygon(15, 20, { r: 155, g: 0, b: 255, a: 1 }, 3, { fill: false, radius: 8 });
+    ngon.rotate(6);
+    scene.addShape(ngon);
+
+    const ngon2 = new RegularPolygon(15, 40, { r: 55, g: 0, b: 255, a: 1 }, 6, { fill: false, sideLength: 12 });
+    ngon2.rotate(20);
+    scene.addShape(ngon2);
+
+    const ngon3 = new RegularPolygon(15, 40, { r: 55, g: 0, b: 255, a: 1 }, 6, { fill: true, sideLength: 6 });
+    ngon3.rotate(20);
+    scene.addShape(ngon3);
+
+    const polygon = new Polygon(40, 20, { r: 255, g: 165, b: 0, a: 1 }, [
+        { x: 10, y: -5 },
+        { x: 20, y: 10 },
+        { x: 15, y: 20 },
+        { x: 5, y: 20 },
+        { x: 0, y: 10 },
+    ], false);
+    polygon.rotate(15);
+    scene.addShape(polygon);
+
+    const polygon2 = new Polygon(45, 45, { r: 0, g: 128, b: 128, a: 1 }, [
+        { x: 0, y: 0, relative: true },
+        { x: 10, y: 5, relative: true },
+        { x: 5, y: 15, relative: true },
+        { x: -5, y: 15, relative: true },
+        { x: 5, y: 5, relative: true },
+    ], true);
+    scene.addShape(polygon2);
+
+    const point = new Point(60, 10, { r: 100, g: 0, b: 0, a: 1 });
+    scene.addShape(point);
+
+    const circle = new Circle(30, 15, { r: 0, g: 0, b: 0, a: 1 }, 9, false);
+    scene.addShape(circle);
+
+    const circle2 = new Circle(30, 15, { r: 0, g: 0, b: 0, a: 1 }, 5, true);
+    scene.addShape(circle2);
+
     const pixels = renderer.render([scene], {
-        screen_width: 64,
-        screen_height: 64,
+        screen_width: width,
+        screen_height: height,
         antialias: true
     });
 
