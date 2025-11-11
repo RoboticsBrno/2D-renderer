@@ -3,8 +3,6 @@ import { Renderer } from "./Renderer.js";
 import { Collection } from "./shapes/Collection.js";
 import { Circle } from "./shapes/Circle.js";
 import { Rectangle } from "./shapes/Rectangle.js"
-import { LineSegment } from "./shapes/LineSegment.js";
-import { Point } from "./shapes/Point.js";
 import { Polygon } from "./shapes/Polygon.js";
 import { RegularPolygon } from "./shapes/RegularPolygon.js";
 

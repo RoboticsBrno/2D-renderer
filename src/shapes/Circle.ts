@@ -129,6 +129,7 @@ export class Circle extends Shape {
 
             for (let x = startX; x <= endX; x++) {
                 const color = this.sampleTexture(x, cy + y);
+                color.a = 1;
                 points.push({
                     x: Math.round(x),
                     y: Math.round(cy + y),
@@ -149,11 +150,6 @@ export class Circle extends Shape {
                 if (distance <= r) {
                     const color = this.sampleTexture(x, y);
                     let alpha = color.a;
-
-                    // Soft edges for anti-aliasing
-                    if (distance > r - 1) {
-                        alpha *= (r - distance);
-                    }
 
                     if (alpha > 0.01) {
                         points.push({
