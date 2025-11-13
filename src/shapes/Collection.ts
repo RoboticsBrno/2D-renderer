@@ -1,6 +1,7 @@
 import { Shape, ShapeParams } from "./Shape.js";
 import { Pixels } from "../Utils.js";
 import { Renderer } from "../Renderer.js";
+import { CircleCollider, Collider } from "../Collider.js";
 
 export class Collection extends Shape {
     shapes: Shape[];
@@ -8,6 +9,11 @@ export class Collection extends Shape {
     constructor({ x, y, color }: ShapeParams) {
         super({ x, y, color });
         this.shapes = [];
+    }
+
+    defaultCollider(): Collider {
+        // Collections do not have a default collider
+        return new CircleCollider(0, 0, 0);
     }
 
     addShape(shape: Shape) {

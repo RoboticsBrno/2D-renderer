@@ -1,5 +1,6 @@
 import { Shape, ShapeParams } from "./Shape.js";
 import { Pixels } from "../Utils.js";
+import { Collider, LineSegmentCollider } from "../Collider.js";
 
 type LineSegmentParams = ShapeParams & {
     x2: number,
@@ -14,6 +15,10 @@ export class LineSegment extends Shape {
         super({ x, y, color, z });
         this.x2 = x2;
         this.y2 = y2;
+    }
+
+    defaultCollider(): Collider {
+        return new LineSegmentCollider(this.x, this.y, this.x2, this.y2);
     }
 
     // https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm

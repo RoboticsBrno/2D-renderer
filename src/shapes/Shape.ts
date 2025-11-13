@@ -1,3 +1,4 @@
+import { Collider } from "../Collider.js";
 import { Texture } from "../Texture.js";
 import { Color, Pixels } from "../Utils.js";
 
@@ -41,6 +42,7 @@ export abstract class Shape {
         offsetY: number,
         rotation: number
     }
+    collider?: Collider;
 
     constructor(params: ShapeParams) {
         this.x = params.x;
@@ -64,6 +66,35 @@ export abstract class Shape {
             offsetX: 0,
             offsetY: 0,
             rotation: 0,
+        }
+    }
+
+    addCollider(collider?: Collider) {
+        if (collider) {
+            this.collider = collider;
+            return;
+        }
+        this.collider = this.defaultCollider();
+    }
+
+    abstract defaultCollider(): Collider;
+
+    removeCollider() {
+        this.collider = undefined;
+    }
+
+    intersects(other: Shape): boolean {
+        if (this.collider && other.collider) {
+            return this.collider.intersects(other.collider);
+        }
+        return false;
+    }
+
+    translate(dx: number, dy: number) {
+        this.x += dx;
+        this.y += dy;
+        if (this.collider) {
+            this.collider.translate(dx, dy);
         }
     }
 
@@ -219,7 +250,6 @@ export abstract class Shape {
     // Xiaolin Wu's line algorithm
     // https://en.wikipedia.org/wiki/Xiaolin_Wu%27s_line_algorithm
     protected wuLine(x0: number, y0: number, x1: number, y1: number): Pixels {
-        console.log('Drawing Wu line from', x0, y0, 'to', x1, y1);
         const points: Pixels = [];
 
         const steep = Math.abs(y1 - y0) > Math.abs(x1 - x0);

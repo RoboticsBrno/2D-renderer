@@ -1,6 +1,7 @@
 import { Shape, ShapeParams } from "./Shape.js";
 import { Pixels } from "../Utils.js";
 import { LineSegment } from "./LineSegment.js";
+import { Collider, PolygonCollider } from "../Collider.js";
 
 type PolygonParams = ShapeParams & {
     vertices: Array<{ x: number, y: number, relative?: boolean }>,
@@ -19,6 +20,10 @@ export class Polygon extends Shape {
             relative: false,
         }));
         this.fill = fill;
+    }
+
+    defaultCollider(): Collider {
+        return new PolygonCollider(this.x, this.y, this.vertices);
     }
 
     private getTransformedVertices(): Array<{ x: number, y: number }> {

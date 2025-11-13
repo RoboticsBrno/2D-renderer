@@ -1,5 +1,6 @@
 import { Shape, ShapeParams } from "./Shape.js";
 import { Pixels } from "../Utils.js";
+import { Collider, RectangleCollider } from "../Collider.js";
 
 type RectangleParams = ShapeParams & {
     width: number,
@@ -12,8 +13,8 @@ export class Rectangle extends Shape {
     height: number;
     fill: boolean;
 
-    constructor({ x, y, z, color, width, height, fill = false }: RectangleParams) {
-        super({ x, y, z, color });
+    constructor({ x, y, color, width, height, fill = false }: RectangleParams) {
+        super({ x, y, color });
         this.width = width;
         this.height = height;
         this.fill = fill;
@@ -55,6 +56,10 @@ export class Rectangle extends Shape {
         }
 
         return points;
+    }
+
+    defaultCollider(): Collider {
+        return new RectangleCollider(this.x, this.y, this.width, this.height);
     }
 
     drawAntiAliased(): Pixels {

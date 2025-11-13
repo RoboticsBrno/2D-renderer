@@ -1,5 +1,6 @@
 import { Shape, ShapeParams } from './Shape.js';
 import { Pixels } from '../Utils.js';
+import { CircleCollider, Collider } from '../Collider.js';
 
 type CircleParams = ShapeParams & {
     radius: number;
@@ -166,5 +167,9 @@ export class Circle extends Shape {
                 }
             }
         }
+    }
+
+    defaultCollider(): Collider {
+        return new CircleCollider(this.x, this.y, this.radius);
     }
 }

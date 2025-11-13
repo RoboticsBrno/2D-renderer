@@ -1,6 +1,7 @@
 import { Shape, ShapeParams } from './Shape.js';
 import { Pixels } from '../Utils.js';
 import { LineSegment } from './LineSegment.js';
+import { Collider, RegularPolygonCollider } from '../Collider.js';
 
 type RegularPolygonParams = ShapeParams & {
     sides: number,
@@ -28,6 +29,14 @@ export class RegularPolygon extends Shape {
             this.type = 'radius';
             this.radius = config.radius;
         }
+    }
+
+    private calculateRadiusFromSideLength(sideLength: number): number {
+        return sideLength / (2 * Math.sin(Math.PI / this.sides));
+    }
+
+    defaultCollider(): Collider {
+        return new RegularPolygonCollider(this.x, this.y, this.sides, this.type === 'radius' ? this.radius! : this.calculateRadiusFromSideLength(this.sideLength!));
     }
 
     private getVertices(): Array<{ x: number, y: number }> {

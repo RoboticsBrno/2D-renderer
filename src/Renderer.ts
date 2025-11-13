@@ -29,11 +29,11 @@ export class Renderer {
 
             if (pixelMap.has(key)) {
                 const existingPixel = pixelMap.get(key)!;
-
-                if (pixel.color.a >= 0.999) {
+                const threshold = 0.999;
+                if (pixel.color.a >= threshold) {
                     pixelMap.set(key, pixel);
                 }
-                else if (existingPixel.color.a < 0.999) {
+                else if (existingPixel.color.a < threshold) {
                     const blended = Renderer.blendPixel(existingPixel, pixel);
                     pixelMap.set(key, blended);
                 }
